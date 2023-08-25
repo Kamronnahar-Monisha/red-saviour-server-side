@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 
 const app = express();
@@ -14,13 +14,58 @@ app.use(express.json());
 
 //mongodb connection uri and client
 const uri = `mongodb+srv://${process.env.USER_NAME}:${process.env.PASSWORD}@cluster0.nomds.mongodb.net/?retryWrites=true&w=majority`;
-const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
+const client = new MongoClient(uri, {
+    serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+    }
+});
 
 
 // async function for CRUD operation
 const run = async () => {
     try {
+        await client.connect();
         const usersCollection = client.db('red-saviour').collection('users');
+        const postsCollection = client.db('red-saviour').collection('posts');
+
+
+        //get api for user
+        app.get('/users', async (req, res) => {
+            const email = req.query.email;
+            const id = req.query.id;
+            let query;
+            if (email) {
+                query = { email };
+            }
+            else {
+                query = { _id: ObjectId(id) };
+            }
+            const user = await usersCollection.findOne(query);
+            res.send(user);
+        })
+
+
+        app.get('/posts',async (req, res)=>{
+            const userId = req.query.id;
+            const query = {patient : userId};
+            const cursor = await postsCollection.find(query);
+            const posts = await cursor.toArray();
+            res.send(posts);
+        })
+
+
+        //get api for posts list of same blood type
+        app.get('/posts-list-of-same-blood-type', async (req, res) => {
+            const bloodType = req.query.bloodType;
+            const id = req.query.id;
+            const query = { bloodType };
+            const cursor = await postsCollection.find(query);
+            let posts = await cursor.toArray();
+            posts = posts.filter(post => post.patient != id);
+            res.send(posts);
+        })
 
 
         //post api for adding a user
@@ -36,6 +81,13 @@ const run = async () => {
             else {
                 res.send({});
             }
+        });
+
+        //post api for post
+        app.post('/post', async (req, res) => {
+            const post = req.body;
+            const result = await postsCollection.insertOne(post);
+            res.send(result);
         });
 
     }
