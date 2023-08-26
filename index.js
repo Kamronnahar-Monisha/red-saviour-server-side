@@ -64,6 +64,8 @@ const run = async () => {
             const cursor = await postsCollection.find(query);
             let posts = await cursor.toArray();
             posts = posts.filter(post => post.patient != id);
+            console.log(posts);
+            console.log(id);
             res.send(posts);
         })
 
@@ -89,6 +91,29 @@ const run = async () => {
             const result = await postsCollection.insertOne(post);
             res.send(result);
         });
+
+
+         //patch api for updating donar field in post
+        app.patch('/update-donors', async (req, res) => {
+            const id = req.query.id;
+            const deletePost = req.query.delete;
+            const donor = req.body.donor;
+            const query = { _id: ObjectId(id) };
+            const post = await postsCollection.findOne(query);
+            const donors = post.donors.filter(prevDonar=>prevDonar.donorId != donor.donorId);
+            if(!deletePost){
+                donors.push(donor);
+            }
+            const updateDoc = {
+                $set: {
+                    donors
+                },
+            };
+            const result = await postsCollection.updateOne(query, updateDoc);
+            res.send([result,donor]);
+        })
+
+
 
     }
     finally {
