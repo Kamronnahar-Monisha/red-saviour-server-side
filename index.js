@@ -47,9 +47,9 @@ const run = async () => {
         })
 
 
-        app.get('/posts',async (req, res)=>{
+        app.get('/posts', async (req, res) => {
             const userId = req.query.id;
-            const query = {patient : userId};
+            const query = { patient: userId };
             const cursor = await postsCollection.find(query);
             const posts = await cursor.toArray();
             res.send(posts);
@@ -93,16 +93,29 @@ const run = async () => {
         });
 
 
-         //patch api for updating donar field in post
+        //patch api for updating donors field in post
         app.patch('/update-donors', async (req, res) => {
             const id = req.query.id;
-            const deletePost = req.query.delete;
+            const purpose = req.query.purpose;
             const donor = req.body.donor;
             const query = { _id: ObjectId(id) };
             const post = await postsCollection.findOne(query);
-            const donors = post.donors.filter(prevDonar=>prevDonar.donorId != donor.donorId);
-            if(!deletePost){
-                donors.push(donor);
+            let donors;
+            if ((purpose === 'delete') || (purpose === 'add')) {
+                donors = post.donors.filter(prevDonar => prevDonar.donorId != donor.donorId);
+                if (purpose == "add") {
+                    donors.push(donor);
+                }
+            }
+            if (purpose === 'confirm') {
+                donors = post.donors.map(prevDonar => {
+                    const updatedDonor = prevDonar;
+                    if (prevDonar.status === 'shortlisted') {
+                        updatedDonor.status = 'confirmed';
+                    }
+                    return updatedDonor;
+                })
+                console.log(donors);
             }
             const updateDoc = {
                 $set: {
@@ -110,9 +123,60 @@ const run = async () => {
                 },
             };
             const result = await postsCollection.updateOne(query, updateDoc);
-            res.send([result,donor]);
+            res.send([result, donor]);
         })
 
+
+        //patch api for updating post status
+        app.patch('/update-post-status', async (req, res) => {
+            const id = req.query.id;
+            const status = req.query.status;
+            const query = { _id: ObjectId(id) };
+            const post = await postsCollection.findOne(query);
+            const updateDoc = {
+                $set: {
+                    status
+                },
+            };
+            const result = await postsCollection.updateOne(query, updateDoc);
+            res.send(result);
+        })
+
+
+        //patch api for updating users status and last donation date
+        app.patch('/update-users-status', async (req, res) => {
+            const id = req.query.id;
+            const status = req.query.status;
+            const query = { _id: ObjectId(id) };
+            const post = await postsCollection.findOne(query);
+            const confirmedDonors = post.donors.filter(donor => donor.status === 'confirmed');
+            const date = new Date();
+            let year = date.getFullYear();
+            let month = date.getMonth() + 1;
+            let dt = date.getDate();
+
+            if (dt < 10) {
+                dt = '0' + dt;
+            }
+            if (month < 10) {
+                month = '0' + month;
+            }
+
+            const currentDate = year + '-' + month + '-' + dt;
+            for (donor of confirmedDonors) {
+                const statusChangeQuery = { _id: ObjectId(donor.donorId) };
+                const updateDoc = {
+                    $set: {
+                        status,
+                        donationTime : currentDate
+                    },
+                };
+                const result = await usersCollection.updateOne(statusChangeQuery, updateDoc);
+
+            }
+            console.log("hi");
+            res.send('update user status and donation time api');
+        })
 
 
     }
