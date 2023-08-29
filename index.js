@@ -31,6 +31,54 @@ const run = async () => {
         const postsCollection = client.db('red-saviour').collection('posts');
 
 
+        app.get('/make-posts-and-donors-upToDate', async (req, res) => {
+            const date = new Date();
+            let year = date.getFullYear();
+            let month = date.getMonth() + 1;
+            let dt = date.getDate();
+
+            if (dt < 10) {
+                dt = '0' + dt;
+            }
+            if (month < 10) {
+                month = '0' + month;
+            }
+
+            const currentDate = year + '-' + month + '-' + dt;
+            const PostCursor = await postsCollection.find();
+            const posts = await PostCursor.toArray();
+            for (const post of posts) {
+                if (currentDate > post.donationDate) {
+                    const query = { _id: ObjectId(post._id) };
+                    const updateDoc = {
+                        $set: {
+                            status: 'closed'
+                        },
+                    };
+                    const result = await postsCollection.updateOne(query, updateDoc);
+                }
+            }
+            // console.log(posts);
+            const UserCursor = await usersCollection.find();
+            const users = await UserCursor.toArray();
+            for (const user of users) {
+                const lastConfirmedDate = new Date(user.donationTime);
+                const difference_In_day = (date.getTime() - lastConfirmedDate.getTime()) / (1000 * 3600 * 24);
+                if (difference_In_day > 90) {
+                    const query = { _id: ObjectId(user._id) };
+                    const updateDoc = {
+                        $set: {
+                            status: 'available'
+                        },
+                    }
+                    const result = await usersCollection.updateOne(query, updateDoc);
+                }
+            }
+            res.send({acknowledgement:true});
+        })
+
+
+
         //get api for user
         app.get('/users', async (req, res) => {
             const email = req.query.email;
@@ -127,6 +175,36 @@ const run = async () => {
         })
 
 
+
+        //patch api for updating donors field in post
+        app.patch('/update-donor-feedback', async (req, res) => {
+            const id = req.query.id;
+            const feedbacks = req.body.data;
+            console.log(feedbacks);
+            const query = { _id: ObjectId(id) };
+            const post = await postsCollection.findOne(query);
+            const donors = [];
+            for (const donor of post.donors) {
+                const temporaryDonor = donor;
+                const feedback = feedbacks[donor.donorId];
+                if (feedback) {
+                    temporaryDonor.feedback = feedback;
+                }
+                else {
+                    temporaryDonor.feedback = "";
+                }
+                donors.push(temporaryDonor);
+            }
+            console.log(donors);
+            const updateDoc = {
+                $set: {
+                    donors
+                },
+            };
+            const result = await postsCollection.updateOne(query, updateDoc);
+            res.send(result);
+        })
+
         //patch api for updating post status
         app.patch('/update-post-status', async (req, res) => {
             const id = req.query.id;
@@ -168,13 +246,13 @@ const run = async () => {
                 const updateDoc = {
                     $set: {
                         status,
-                        donationTime : currentDate
+                        donationTime: currentDate,
+                        donatedPost: id
                     },
                 };
                 const result = await usersCollection.updateOne(statusChangeQuery, updateDoc);
 
             }
-            console.log("hi");
             res.send('update user status and donation time api');
         })
 
