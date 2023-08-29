@@ -221,6 +221,23 @@ const run = async () => {
         })
 
 
+        //patch api for updating user status
+        app.patch('/update-user-status', async (req, res) => {
+            const id = req.query.id;
+            const status = req.query.status;
+            const query = { _id: ObjectId(id) };
+            const user = await usersCollection.findOne(query);
+            const updateDoc = {
+                $set: {
+                    status
+                },
+            };
+            const result = await usersCollection.updateOne(query, updateDoc);
+            res.send(result);
+        })
+
+
+
         //patch api for updating users status and last donation date
         app.patch('/update-users-status', async (req, res) => {
             const id = req.query.id;
