@@ -29,6 +29,8 @@ const run = async () => {
         await client.connect();
         const usersCollection = client.db('red-saviour').collection('users');
         const postsCollection = client.db('red-saviour').collection('posts');
+        const reportsCollection = client.db('red-saviour').collection('reports');
+        const notificationsCollection = client.db('red-saviour').collection('notifications');
 
 
         app.get('/make-posts-and-donors-upToDate', async (req, res) => {
@@ -74,7 +76,7 @@ const run = async () => {
                     const result = await usersCollection.updateOne(query, updateDoc);
                 }
             }
-            res.send({acknowledgement:true});
+            res.send({ acknowledgement: true });
         })
 
 
@@ -94,6 +96,21 @@ const run = async () => {
             res.send(user);
         })
 
+        //get api for user by dyn
+        app.get('/user/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email };
+            const user = await usersCollection.findOne(query);
+            res.send(user);
+        })
+
+        //get api for user by dyn
+        app.get('/post/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = {_id: ObjectId(id)};
+            const post = await postsCollection.findOne(query);
+            res.send(post);
+        })
 
         app.get('/posts', async (req, res) => {
             const userId = req.query.id;
@@ -139,6 +156,63 @@ const run = async () => {
             const result = await postsCollection.insertOne(post);
             res.send(result);
         });
+
+        //post api for report
+        app.post('/report', async (req, res) => {
+            const report = req.body;
+            const result = await reportsCollection.insertOne(report);
+            res.send(result);
+        });
+
+        //get api for reports on specific type
+        app.get('/reports', async (req, res) => {
+            const type = req.query.type;
+            const query = { type };
+            const cursor = await reportsCollection.find(query);
+            const reports = await cursor.toArray();
+            res.send(reports);
+        })
+
+
+        //patch api for changing resole value of report
+        app.patch('/report', async (req, res) => {
+            const id = req.query.id;
+            const query = { _id: ObjectId(id) };
+            const updateDoc = {
+                $set: {
+                    resolve: true
+                },
+            };
+            const result = await reportsCollection.updateOne(query, updateDoc);
+            res.send(result);
+        })
+
+        //delete api for single report
+        app.delete('/report', async (req, res) => {
+            const id = req.query.id;
+            const query = { _id: ObjectId(id) };
+            const result = await reportsCollection.deleteOne(query);
+            res.send(result);
+        })
+
+
+        //get api for all notification of a specific user id
+        app.get('/notifications', async (req, res) => {
+            const id = req.query.id;
+            const query = { donorId : id };
+            const cursor = await notificationsCollection.find(query);
+            const notifications = await cursor.toArray();
+            res.send(notifications);
+        })
+
+        //delete api for single report
+        app.delete('/post', async (req, res) => {
+            const id = req.query.id;
+            const query = { _id: ObjectId(id) };
+            const result = await postsCollection.deleteOne(query);
+            res.send(result);
+        })
+
 
 
         //patch api for updating donors field in post
@@ -259,6 +333,14 @@ const run = async () => {
 
             const currentDate = year + '-' + month + '-' + dt;
             for (donor of confirmedDonors) {
+                //adding notification
+                const notification ={
+                    postId : id,
+                    donationDate : currentDate,
+                    donorId : donor.donorId
+                }
+                const notificationResult = await notificationsCollection.insertOne(notification);
+                //changing status
                 const statusChangeQuery = { _id: ObjectId(donor.donorId) };
                 const updateDoc = {
                     $set: {
