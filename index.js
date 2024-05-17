@@ -367,7 +367,7 @@ run().catch(console.dir);
 
 //root api 
 app.get('/', (req, res) => {
-    res.send('Welcome to red-saviour server side');
+    res.send('Welcome to red saviour');
 })
 
 app.listen(port, () => {
